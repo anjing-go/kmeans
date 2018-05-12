@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <link rel="stylesheet" href="lib/bootstrap.min.css">
+    <script src="lib/vue.js"></script>
+
+
+</head>
+<body>
+<div class="app">
+    <div>
+        <span v-for="(step, index) in steps" v-if="index+1 === kSteps">
+            第{{ step.id }}步：{{ step.message }} {{ step.func }}
+
+            <button v-on:click="kSteps += 1" class="btn btn-primary"
+                    v-if="index+1 === 1 ||index+1 === 2">下一步</button>
+            <button v-on:click="setUp" class="btn btn-primary"
+                    v-if="index>1">计算</button>
+        </span>
+
+    </div>
+    <div class="canvas" @click="addPoint($event)">
+        <span class="point"  v-for="point in points" :style="{top: point.y+'px',left:point.x+'px'}"></span>
+        <span class="cpoint" v-for="cPoint in cPoints" :style="{top: cPoint.y+'px',left:cPoint.x+'px'}"></span>
+    </div>
+    <span v-if="nowPint">当前点坐标({{x}},{{y}})</span>
+    <hr>
+    <ul class="fl">
+        <li>点集</li>
+
+        <li v-for="point in points" v-if="initShow">坐标{{ point.x }}px,{{ point.y }}px,{{point.k}}</li>
+    </ul>
+    <ul class="fl">
+        <li>中心</li>
+
+        <li v-for="cPoin in cPoints" v-if="initShow">坐标{{ cPoin.x }}px,{{ cPoin.y }}px,{{cPoin.k}}</li>
+    </ul>
+
+
+</div>
+
+
+
+</div>
+<script type="text/javascript">
+    new Vue({
+
+        /**
+         * 设置默认值进行初始化
+         * @param k 聚类个数
+         * @param x 在canvas 中点击坐标的X坐标
+         * @param y 在canvas 中点击坐标的y坐标
+         * @param num 在canvas 分类次数
+         * @param ksteps 控制步骤显示
+         * @param nowPint 第一步正在点击的坐标是否显示 true 显示  false 不显示
+         * @param initShow 第一步初始化的坐标集是否显示 true 显示  false 不显示
+         * @param points 第一步用户输入点集
+         * @param cPoints 第二步用户输入中心点集
+         * @param steps k-means 步骤信息 id第几步 message提示信息
+         *
+         */
+        el: '.app',
+        data: {
+            k: 0,
+            x: 0,
+            y: 0,
+            num: 1,
+            kSteps: 1,
+            nowPint:true,
+            initShow:true,
+            points:[],
+            cPoints:[],
+            cColor:'',
+            steps:[
+                {
+                    id: 1,
+                    message: "在灰色区域选取坐标",
+                    func: "s"
+                },
+                {
+                    id: 2,
+                    message: "在灰色区域选取分类点坐标（ps：点数为分类数）",
+                    func: ""
+                },
+                {
+                    id: 3,
+                    message: "尝试次聚类 ",
+                    func: ""
+                },
+
+                {
+
+                    id: 4,
+                    message :"NICE已找到最佳中心点"
+                }
+            ]
+
+        },
+        methods: {
+            /**
+             * 在canvas坐标系中添加一个点 坐标点 or 中心点
+             * @param e 鼠标点击事件
+             */
+            addPoint: function(e) {
+                this.x = e.layerX;
+                this.y = e.layerY;
+                if(this.kSteps === 1){
+                    let pin = {x: this.x, y: this.y, k: this.k,color:'#1c7430'};
+
+                   // console.log(pin);
+                    this.points.push(pin);
+                    //console.log("点集长度" + this.points.length);
+                }else if(this.kSteps === 2){
+                    this.k+=1;
+                    kcolor = "#"+Math.random(100000,999999);
+                    let spin = {x: this.x, y: this.y, k: this.k,color:kcolor};
+
+                   // console.log(spin);
+                    this.cPoints.push(spin);
+                   // console.log("中心点集长度" + this.cPoints.length);
+
+                 }
+
+
+            },
+            /**
+             * 给点集分组
+             * @param points 输入点集
+             * @param cPoints 当前中心点
+             */
+            kMeans:function(points,cPoints){
+                let j = points.length;
+                let z = cPoints.length;
+                for (let i= 0; i< j; ++i){
+                    let p = points[i];
+                    let minDistance = -1;
+                    let minC = 0;
+                    //当前循环点属于哪个分类
+                   for(let y= 0; y< z; ++y){
+                       var c = cPoints[y];
+
+                       let zx = p.x-c.x;
+                       let zy = p.y-c.y;
+                       let pxp = Math.pow(zx,2);
+                       let pyp = Math.pow(zy,2);
+                       let sumXY = pxp+pyp ;
+                       let distance = Math.sqrt(sumXY);
+                       if (minDistance === -1 || minDistance > distance){
+                           minDistance = distance;
+                           minC = c;
+                       }
+
+                   }
+                       p.k = minC.k;
+                       p.color =minC.color;
+
+
+                }
+                console.log('kmeans func end');
+
+
+            },
+            /**
+             * 计算中心点，并修改当前中心点坐标
+             * @param points 输入点集
+             * @param cPoints 当前中心点
+             */
+            kresetCenter:function (points,cPoints) {
+                let j = points.length;
+                let z = cPoints.length;
+                for (let y= 0; y< z; ++y) {
+
+                    let c=cPoints[y];
+                    let sunX =0;
+                    let sunY = 0;
+                    let pSize =0;
+                    for(let i= 0; i< j; ++i){
+                        let p =points[i];
+                        if (c.k === p.k) {
+                            sunX = sunX + p.x;
+                            sunY = sunY + p.y;
+                            pSize = pSize + 1;
+                            console.log("pSize"+pSize);
+                        }
+                    }
+                    //判断当前中心点是否为最佳中心点
+                    if (pSize>0) {
+                        console.log("if");
+                        var pCentX = sunX / pSize;
+                        var pCentY = sunY / pSize;
+                        console.log(" pCentX" + pCentX);
+                        console.log(" pCenty" + pCentY);
+                        console.log(" c.x" + c.x);
+                        console.log(" c.y" + c.y);
+                        if (pCentX === c.x && pCentY === c.y){
+                            alert("K-means 最佳点已找到");
+                            console.log("you win");
+                            this.kSteps =4;
+                        }
+
+                        else {
+                            console.log("else");
+                            c.x = pCentX;
+                            c.y = pCentY;
+                            console.log("c.x" + c.x);
+                            console.log("c.y" + c.y);
+                            console.log("ing");
+
+                        }
+                    }
+                    //console.log("reset");
+
+                }
+
+            },setUp:function () {
+                this.$options.methods.kMeans(this.points,this.cPoints);
+                this.$options.methods.kresetCenter(this.points,this.cPoints);
+            },resetKmeans:function () {
+
+            }
+        }
+    });
+</script>
+<style>
+    html, body, div, span, object, iframe,
+    h1, h2, h3, h4, h5, h6, p, blockquote, pre,
+    abbr, address, cite, code,
+    del, dfn, em, img, ins, kbd, q, samp,
+    small, strong, sub, sup, var,
+    b, i,
+    dl, dt, dd, ol, ul, li,
+    fieldset, form, label, legend,
+    table, caption, tbody, tfoot, thead, tr, th, td,
+    article, aside, canvas, details, figcaption, figure,
+    footer, header, hgroup, menu, nav, section, summary,
+    time, mark, audio, video {
+        margin:0;
+        padding:0;
+        border:0;
+        outline:0;
+        font-size:100%;
+        vertical-align:baseline;
+        background:transparent;
+    }
+    .point,.cpoint{
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+    }
+    .point{
+        background-color: #1c7430;
+    }
+    .cpoint{
+        background-color: #ac2925;
+    }
+
+    .app{
+
+
+    }
+    .canvas{
+        padding: 0px;
+        border: 1px solid #ac2925;
+        width: 700px;
+        height: 300px;
+        position: relative;
+        background-color: #EEEEE0;
+    }
+    .fl{
+        float: left;
+        width:50%;
+    }
+</style>
+</body>
+</html>
